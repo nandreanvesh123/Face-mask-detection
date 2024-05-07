@@ -1,0 +1,108 @@
+import os 
+import cv2 
+import numpy as np 
+import pandas as pd 
+from PIL import Image 
+from pathlib import Path 
+import matplotlib.pyplot as plt 
+import seaborn as sns 
+from sklearn.model_selection import train_test_split 
+import tensorflow as tf 
+from tensorflow import keras 
+from tensorflow.keras.models import Sequential 
+from tensorflow.keras.layers import Flatten ,Dense ,Dropout ,BatchNormalization 
+from tensorflow.keras.optimizers import Adamax 
+from tensorflow.keras.utils import plot_model 
+data_with_mask_dir = '/content/drive/MyDrive/with_mask'
+data_without_mask_dir = '/content/drive/MyDrive/without_mask'
+data_with_mask= os.listdir(data_with_mask_dir)[:5]
+data_without_mask= os.listdir(data_without_mask_dir)[:5]
+for img_file in data_with_mask:
+ img_path = os.path.join(data_with_mask_dir, img_file)
+ img = Image.open(img_path)
+ plt.imshow(img)
+ plt.title('Image with Mask')
+ plt.axis('off')
+ plt.show()
+data_with_mask= os.listdir(data_with_mask_dir)
+data_without_mask= os.listdir(data_without_mask_dir)
+print('Number of without mask images:', len(data_without_mask))
+print('Number of with mask images:', len(data_with_mask))
+with_mask_labels = [1]*len(data_with_mask)
+print(f"With Mask labels" ,with_mask_labels[0:10])
+without_mask_labels = [0]*len(data_without_mask)
+print(f"Without Mask Labels", without_mask_labels[0:10])
+Labels = with_mask_labels + without_mask_labels 
+print(f"Labels", Labels[0:10])
+print(f"Labels", Labels[-10:])
+images = []
+def load_images_from_folder(folder):
+ for filename in os.listdir(folder):
+ img = Image.open(os.path.join(folder,filename))
+ img = img.resize((128,128))
+ img = img.convert('RGB')
+ images.append(np.array(img))
+ return images 
+with_mask_images = load_images_from_folder('/content/drive/MyDrive/with_mask')
+without_mask_images = load_images_from_folder('/
+len(images)
+images[0].shape 
+X = np.array(images)
+Y = np.array(Labels)
+print(X.shape)
+print(Y.shape)
+X_train,X_test,Y_train,Y_test=train_test_split(X,Y,test_size=0.2,random_state=42)
+print(f"Shape of X_train is: {X_train.shape}")
+print(f"Shape of Y_train is: {Y_train.shape}\n")
+print(f"Shape of X_test is: {X_test.shape}")
+print(f"Shape of Y_test is: {Y_test.shape}")
+#scaling the data
+X_train = X_train/255
+X_test = X_test/255
+image_size = (128,128)
+channels = 3
+image_shape = (image_size[0],image_size[1], channels)
+base_model = tf.keras.applications.ResNet152V2(
+ include_top=False,
+ weights="imagenet",
+ input_shape=image_shape)
+model = Sequential([
+ base_model,
+Flatten(),
+ BatchNormalization(),
+ Dense(256, activation ='relu'),
+ Dropout(rate=0.2),
+ BatchNormalization(),
+ Dense(128, activation ='relu'),
+ Dropout(rate=0.2),
+ BatchNormalization(),
+ Dense(64, activation ='relu'),
+ Dropout(rate=0.2),
+ Dense(2, activation ='sigmoid')
+])
+model.compile(Adamax(learning_rate=0.001),
+ loss='sparse_categorical_crossentropy',
+ metrics=['accuracy'])
+model.summary()
+history = model.fit(X_train, Y_train, epochs=10, validation_split=0.1)
+loss, accuracy = model.evaluate(X_test, Y_test)
+print('Test Accuracy =', accuracy)
+from sklearn.metrics import classification_report 
+y_pred = model.predict(X_test)
+y_pred = np.argmax(y_pred, axis=1)
+print(classification_report(Y_test, y_pred))
+input_image_path = '/content/drive/MyDrive/with_mask'
+input_image = cv2.imread(input_image_path)
+plt.imshow(input_image)
+plt.show()
+input_image_resized = cv2.resize(input_image, (128,128))
+input_image_scaled = input_image_resized/255
+input_image_reshaped = np.reshape(input_image_scaled, [1,128,128,3])
+input_prediction = model.predict(input_image_reshaped)
+print(input_prediction)
+input_pred_label = np.argmax(input_prediction)
+print(input_pred_label)
+if input_pred_label == 1:
+ print('The person in the image is wearing a mask')
+else:
+ print('The person in the image is not wearing a mask')
